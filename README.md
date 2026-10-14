@@ -1,63 +1,90 @@
-[README (2).md](https://github.com/user-attachments/files/33447173/README.2.md)
+
 # Budget-Disciplined Prompting for Small Local Software Engineering Agents
 
-A prompt-only Gemma 4 31B software-engineering agent configuration using
-an early-edit policy, a bounded verification loop, and an eight-minute
-execution budget.
+**A Prompt-Only Gemma 4 31B Agent and the Limits of What a Leaderboard
+Score Can Show**
 
-> **Research status:** This repository documents a configuration and a
-> reported public leaderboard result. The current evidence does not
-> establish that the prompting policy outperforms alternative policies.
-> Ablations and trace-level failure analysis are not reported as
-> completed.
+This repository documents the configuration and research context for a
+prompt-only Gemma 4 31B software-engineering agent submitted to the
+**Google --- Gemma 4 Developer Agent Paper Track**.
+
+## Paper
+
+-   **Author:** Sourab Ghosh
+-   **ResearchGate DOI:**
+    [10.13140/RG.2.2.29014.41285](https://doi.org/10.13140/RG.2.2.29014.41285)
+-   **Paper page / full text:** [Read the paper on
+    ResearchGate](https://doi.org/10.13140/RG.2.2.29014.41285)
+-   **Competition:** [Google --- The Gemma 4 Developer Agent Paper
+    Track](https://www.kaggle.com/competitions/gemma-4-developer-agent-paper)
+-   **Research status:** ResearchGate-hosted paper/preprint. The DOI
+    provides a persistent link; it does not by itself imply
+    peer-reviewed journal publication.
 
 ## Overview
 
-This project investigates how explicit prompting rules can guide a local
-software-engineering agent operating under tight execution constraints.
+The paper investigates whether explicit prompt rules can help a
+software-engineering agent allocate a limited interaction budget among
+repository exploration, editing, verification, and patch submission.
 
-The submitted configuration used:
+The approach is **prompt-only**: it uses a single system prompt to
+specify an action policy, without fine-tuning, LoRA adapters, or
+subagents. The prompt is approximately 3.2 KB and encourages early
+editing, bounded verification, and deliberate submission.
 
--   **Model:** `gemma-4-31b-it-qat-w4a16-ct`
--   **Approach:** Prompt-only; no LoRA adapters or subagents
--   **Temperature:** `0.2`
--   **Top-p:** `0.95`
--   **Maximum output tokens:** `8192`
--   **Thinking budget:** `4096`, with thoughts retained
--   **Execution budget:** 8 minutes
--   **Tool-call budget:** 28 calls
--   **Command timeout:** 240 seconds
--   **Turn limit:** 80 turns
--   **Reported public leaderboard score:** `0.13`
+The central claim is deliberately limited. The submitted configuration
+provides a documented baseline, but the available evidence does not
+establish that the policy outperforms alternative prompts, tools, or
+budgets.
 
-The score above is the public leaderboard score for the reported
-submission. It should not be interpreted as a resolution rate or as
-evidence of improvement over a baseline.
+## Reported configuration
 
-## Prompting policy
+  Setting                    Value
+  -------------------------- -----------------------------------------------------
+  Model                      `gemma-4-31b-it-qat-w4a16-ct`
+  Approach                   Prompt-only; no fine-tuning, adapters, or subagents
+  Temperature                `0.2`
+  Top-p                      `0.95`
+  Maximum output tokens      `8192`
+  Thinking budget            `4096` tokens; thoughts retained
+  Context window             `32768` tokens
+  Agent time budget          8 minutes
+  Tool-call limit            28
+  Command/test timeout       240 seconds
+  Turn limit                 80
+  Enabled tools              6 of 9
+  Public leaderboard score   `0.13`
 
-The prompt organizes agent behavior around six rule groups:
+The score `0.13` is the reported public leaderboard score for submission
+`googleabcd`, version 2. It is **not** described here as a resolution
+rate or as evidence of improvement over a baseline.
 
-1.  **Contract first:** Identify exact symbols, strings, status codes,
-    and function signatures before editing.
-2.  **Focused localization:** Use one focused `git grep` and read no
-    more than 120 lines at a time.
-3.  **Edit early:** Aim to make an edit by tool call 12.
-4.  **Bounded verification:** Run at most one focused `pytest -k` check
-    and allow one repair attempt; avoid running bare `pytest`.
-5.  **Submit deliberately:** Keep scratch scripts in `/tmp`, submit the
-    patch, and submit when fewer than 90 seconds remain even if the
-    local check is still red.
-6.  **Avoid unproductive exploration:** Do not conclude that the code is
-    already correct, do not search outside `/workspace`, and avoid broad
-    exploration after the first edit.
+## Prompt policy
 
-These are the intended policies encoded in the prompt. Their individual
-effects have not yet been isolated by completed ablation experiments.
+The system prompt encodes six groups of rules:
 
-## Tool configuration
+1.  **Contract first.** Extract exact symbols, signatures, error
+    strings, status codes, and return values from the task requirements.
+2.  **Bounded localization.** Use a focused `git grep` and inspect a
+    limited code region, generally no more than 120 lines at a time.
+3.  **Edit early.** Aim to modify a source file by tool call 12.
+4.  **Bounded verification.** Run at most one focused check and permit
+    one repair attempt; avoid running the full test suite.
+5.  **Submit deliberately.** Keep scratch scripts in `/tmp`, prepare a
+    clean patch, and submit before the remaining time becomes too short.
+6.  **Avoid unproductive exploration.** Stay within `/workspace` and
+    avoid broad searches after the first edit.
 
-Six tools were enabled:
+These are the policy rules used by the submitted configuration. Their
+individual effects have not been established by completed ablation
+experiments. Some rules are benchmark-specific and should not be copied
+into production workflows without reconsideration---for example, real
+engineering must allow an agent to conclude that an issue is already
+resolved.
+
+## Tool selection
+
+The submitted configuration enables:
 
 -   `run_command`
 -   `read_file`
@@ -66,76 +93,79 @@ Six tools were enabled:
 -   `get_status`
 -   `submit_patch`
 
-The following graph-oriented tools were not enabled:
+The following graph-oriented tools are not enabled:
 
 -   `get_code_neighbors`
 -   `search_similar_code`
 -   `get_code_subgraph`
 
-The omission of graph-oriented tools is a configuration choice, not a
-demonstrated performance optimization.
+This is a design choice, not a demonstrated optimization. Whether
+enabling graph tools would improve performance remains an open
+experimental question.
 
-## Evaluation and evidence
+## Evaluation result and limitations
 
-The reported public leaderboard score for the `googleabcd` submission,
-version 2, was **0.13**.
+The only scored submission reported in the paper is `googleabcd`,
+version 2, with a public leaderboard score of `0.13`.
 
-The available record does not establish:
+The current evidence does **not** establish:
 
--   a verified baseline score for comparison;
--   completed ablation results;
--   trace-level failure counts;
--   the complete local evaluation command, concurrency, and task count;
-    or
--   the cause of other submission attempts that errored or timed out.
+-   performance improvement over a verified baseline;
+-   the causal contribution of any individual prompt rule;
+-   that omitting graph tools improves performance;
+-   that the eight-minute budget is better than a larger budget;
+-   trace-level counts explaining why tasks failed; or
+-   generalization beyond the competition environment.
 
-These gaps are intentionally disclosed rather than filled with
-estimates. The claim that budget allocation matters more than total
-budget remains a research hypothesis, not a demonstrated conclusion.
+Other submission attempts reportedly errored or timed out, but their
+causes have not been established and are not attributed to specific
+faults here.
 
-## Proposed follow-up experiments
+## Proposed experiments
 
-The following experiments are proposed and should be marked as **not
-run** unless results are added:
+The paper proposes, but does not report as completed, the following
+ablations:
 
--   Remove the edit-by-call-12 constraint.
--   Remove the one-check/one-repair constraint.
--   Enable the graph-oriented tools.
--   Disable model thinking.
--   Compare against a larger execution budget.
--   Analyze agent traces using explicit failure categories, such as no
-    edit, wrong file or function, incorrect behavior, exact-string
-    mismatch, stray files, truncated calls, and time/budget exhaustion.
+-   Remove the edit-by-call-12 rule.
+-   Remove the one-check/one-repair limit.
+-   Enable the three graph-oriented tools.
+-   Set the thinking budget to zero.
+-   Compare with the default 60-minute, 100-call budget.
+-   Classify task traces by failure mode.
 
-For a meaningful comparison, record the harness version, exact command,
-concurrency, task count, per-task outcomes, and all configuration
-differences.
+A rigorous comparison should hold the task set and other settings
+constant, and report the harness version, evaluation command,
+concurrency, number of tasks, per-task outcomes, and execution failures.
+Proposed experiments must remain labelled **not run** until results are
+actually collected.
 
-## Reproducibility
+## Artifact and reproducibility
 
-A reproducible release should include the exact files used for the
-scored submission, including the prompt and configuration files,
-together with:
+The paper describes the submitted artifact as a 2.4 KB archive
+containing exactly four files:
 
--   the competition harness/version;
--   the exact evaluation command;
--   the concurrency setting and number of tasks;
--   per-task pass/fail outcomes, where permitted;
--   the environment and dependency requirements; and
--   a clear distinction between completed experiments and proposed work.
+``` text
+agent.yaml
+configs/sampling.yaml
+eval_config.yaml
+prompts/system.md
+```
 
-**Important:** This README is a summary of the reported configuration.
-It is not a substitute for the original submission files. Before
-publishing, verify every value against the exact submitted prompt,
-configuration, and competition harness. Do not describe a reconstructed
-configuration as the original experiment.
+For faithful reproduction, use the original files from the scored
+submission rather than a reconstructed configuration. The exact harness
+version, local evaluation command, concurrency, local task count, and
+task-level traces were not established in the available record.
+
+Harness behavior described in the paper---including patch recovery,
+handling of untracked files, protected test/configuration changes, call
+accounting, and timing---should be checked against the exact harness
+version used for any reproduction.
 
 ## Related work
 
 -   Jimenez, C. E., Yang, J., Wettig, A., Yao, S., Pei, K., Press, O., &
     Narasimhan, K. R. (2024). [SWE-bench: Can language models resolve
-    real-world GitHub
-    issues?](https://openreview.net/forum?id=VTF8yNQM66). In *The
+    real-world GitHub issues?](https://arxiv.org/abs/2310.06770). *The
     Twelfth International Conference on Learning Representations (ICLR
     2024)*.
 -   Xia, C. S., Deng, Y., Dunn, S., & Zhang, L. (2024). [Agentless:
@@ -145,20 +175,26 @@ configuration as the original experiment.
 -   Yang, J., Jimenez, C. E., Wettig, A., Lieret, K., Yao, S.,
     Narasimhan, K. R., & Press, O. (2024). [SWE-agent: Agent-computer
     interfaces enable automated software
-    engineering](https://doi.org/10.52202/079017-1601). In *Advances in
-    Neural Information Processing Systems* (Vol. 37).
+    engineering](https://arxiv.org/abs/2405.15793). *Advances in Neural
+    Information Processing Systems, 37*.
 
 ## License
 
-No license is specified in this repository template. Add a license only
-after confirming the applicable competition rules, ownership of the
-submitted materials, and compatibility with dependencies and third-party
-components. If the competition requires an OSI-approved license that
-permits commercial use for a winning solution, select a compatible
-license before release.
+No repository license is specified by this README. Before adding one,
+confirm the competition's code-release requirements, rights to publish
+the original submission, and compatibility with dependencies and
+third-party materials. If a winning submission must use an OSI-approved
+license permitting commercial use, choose a compatible license and
+verify the requirement against the official competition rules.
 
 ## Citation
 
-If you use or discuss this work, cite the associated paper once its
-public version and bibliographic details are finalized. Until then, do
-not invent a publication venue, DOI, or arXiv identifier.
+Ghosh, S. (2026, October 14). *Budget-disciplined prompting for small
+local software engineering agents: A prompt-only Gemma 4 31B agent and
+the limits of what a leaderboard score can show*. ResearchGate.
+https://doi.org/10.13140/RG.2.2.29014.41285
+
+If you reuse this work, cite the paper using the DOI above. Do not imply
+that the leaderboard result proves the effectiveness of any individual
+policy rule; the paper explicitly treats it as a baseline pending
+controlled experiments.
